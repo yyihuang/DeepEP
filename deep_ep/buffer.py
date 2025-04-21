@@ -351,14 +351,14 @@ class Buffer:
             x: `[num_tokens, hidden]` with `torch.bfloat16`, the tokens to send for reducing to its original ranks.
             handle: a must-set communication handle, you can obtain this from the dispatch function.
             topk_weights: `[num_tokens, num_topk]` with `torch.float`, the tokens' top-k weights for reducing to its original ranks.
-            config: the performance tuning config.
+            config: the performance tuning config. (global weights for each token)
             previous_event: the event to wait before actually executing the kernel.
             async_finish: the current stream will not wait for the communication kernels to be finished if set.
             allocate_on_comm_stream: control whether all the allocated tensors' ownership to be on the communication stream.
 
         Returns:
             recv_x: the reduced token from its dispatched ranks.
-            recv_topk_weights: the reduced top-k weights from its dispatch ranks.
+            recv_topk_weights: the reduced top-k weights from its dispatch ranks. (me: not used for now)
             event: the event after executing the kernel (valid only if `async_finish` is set).
         """
         # Default config

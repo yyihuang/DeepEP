@@ -136,7 +136,9 @@ def get_buffer(group: dist.ProcessGroup, hidden_bytes: int) -> Buffer:
         _buffer = Buffer(group, num_nvl_bytes, num_rdma_bytes)
     return _buffer
 
-
+# dim[0]: number of tokens
+# dim[1]: hidden size
+# why times 2 bytes?
 def get_hidden_bytes(x: torch.Tensor) -> int:
     t = x[0] if isinstance(x, tuple) else x
     return t.size(1) * max(t.element_size(), 2)
