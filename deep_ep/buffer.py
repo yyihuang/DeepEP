@@ -239,6 +239,36 @@ class Buffer:
                  allocate_on_comm_stream: bool = False) -> \
             Tuple[Union[Tuple[torch.Tensor, torch.Tensor], torch.Tensor], Optional[torch.Tensor],
                   Optional[torch.Tensor], List[int], Tuple, EventOverlap]:
+        '''
+        example:
+        consider dp: gpu 0 holds token [1,2,3] gpu 1 holds token [4]
+        gpu 0 holds expert 0,1 and gpu 1 holds expert 2,3
+
+        ==tokens==
+        for gou 0: x = [1,2,3]
+        for gpu 1: x = [4]
+
+        consider the gating network:
+        token [1,2,3,4]
+        expert[0,1,2,3]
+
+        topk =1
+        topk_idx = [0,1,2,3]
+        topk_weights = [1,1,1,1]
+
+        then recv_x on gpu 0 will be [1,2] (tokens, hidden)
+             recv_x on gpu 1 will be [3,4] (tokens, hidden)
+
+        recv_topk_idx on gpu 0 will be [0,1] (gpu_idx)
+             recv_topk_idx on gpu 1 will be [2,3]
+
+        recv_topk_weights on gpu 0 will be [1,1]
+             recv_topk_weights on gpu 1 will be [1,1]
+
+
+        '''
+
+
         """
         Dispatch tokens to different ranks, both intranode and internode settings are supported.
         Intranode kernels require all the ranks should be visible via NVLink.
@@ -246,7 +276,7 @@ class Buffer:
             index should be visible via RDMA.
 
         Arguments:
-            x: `torch.Tensor` or tuple of `torch.Tensor`, for the first type, the shape must be `[num_tokens, hidden]`,
+            x: `torch.Tensor` or tuple of `torch.Tensor`, for the first type, the shape must be `[num_tokens, hidden]`, (num_tokens on the calling gpu)
                 and type must be `torch.bfloat16`; for the second type, the first element of the tuple must be shaped as
                 `[num_tokens, hidden]` with type `torch.float8_e4m3fn`, the second must be `[num_tokens, hidden // 128]`
                  (requiring divisible) with type `torch.float`.
@@ -258,7 +288,7 @@ class Buffer:
             num_tokens_per_expert: `[num_experts]` with `torch.int`, the number of tokens to be sent to each expert.
             topk_idx: `[num_tokens, num_topk]` with `torch.int64`, the expert indices selected by each token,
                 `-1` means no selections.
-            topk_weights: `[num_tokens, num_topk]` with `torch.float`, the expert weights of each token to dispatch.
+            topk_weights: `[num_tokens, num_topk]` with `torch.float`, the expert weights of each token to dispatch. (k=2, then 2 weights to do a weighted sum/avg)
             expert_alignment: align the number of tokens received by each local expert to this variable.
             config: the performance tuning config.
             previous_event: the event to wait before actually executing the kernel.
@@ -268,8 +298,8 @@ class Buffer:
         Returns:
             recv_x: received tokens, the same type and tuple as the input `x`, but the number of tokens equals to the
                 received token count.
-            recv_topk_idx: received expert indices.
-            recv_topk_weights: received expert weights.
+            recv_topk_idx: received expert indices. [num_tokens, num_topk]
+            recv_topk_weights: received expert weights. [num_tokens, num_topk]
             num_recv_tokens_per_expert_list: Python list shaped `[num_local_experts]`, the received token count by
                 each local expert, aligned to the input `expert_alignment`.
             handle: the returned communication handle.
